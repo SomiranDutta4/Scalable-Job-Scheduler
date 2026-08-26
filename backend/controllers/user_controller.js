@@ -21,16 +21,13 @@ const signup = async (req, res) => {
                 message: "User already exists"
             });
         }
-
         const passwordHash = await bcrypt.hash(password, 10);
-
         const user = await User.create({
             id,
             name,
             email,
             passwordHash
         });
-
         res.status(201).json({
             message: "User created successfully",
             user: {
