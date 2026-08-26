@@ -1,5 +1,5 @@
 const { WebSocketServer } = require("ws");
-const { subscriber } = require("../config/redis");
+const { subscriber } = require("./config/redis");
 
 const setupWebSocket = async (server) => {
     const wss = new WebSocketServer({

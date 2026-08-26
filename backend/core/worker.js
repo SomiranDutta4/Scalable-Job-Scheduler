@@ -21,7 +21,6 @@ class Worker {
     }
     async start() {
         console.log(`Worker ${this.workerId} started`);
-        await connectRedis();
         while (this.running) {
             try {
                 await this.processDelayedJob();

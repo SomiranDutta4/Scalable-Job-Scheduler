@@ -6,8 +6,8 @@ const http = require("http");
 const { connectDB } = require("./config/db");
 const { connectRedis } = require("./config/redis");
 const { router } = require("./routes/route");
-const Worker = require("./src/services/worker");
-const setupWebSocket = require("./src/websocket");
+const Worker = require("./core/worker");
+const setupWebSocket = require("./websocket");
 
 const app = express();
 const server = http.createServer(app);

@@ -3,7 +3,7 @@ const router=express.Router()
 
 const {signup,login}=require('../controllers/user_controller')
 const {createJob, getJob,cancelJob,retryJob} =require('../controllers/job_controller')
-const {auth}=require('../services/auth')
+const auth = require("../services/auth");
 const rateLimiter = require("../services/rateLimiter")
 
 
