@@ -148,7 +148,8 @@ class Worker {
                 `Worker error while processing job ${jobId}:`,
                 error.message
             );
-        } finally {
+            await this.processFailure(jobId);
+        }finally {
             await redisClient.del(
                 lockKey
             );

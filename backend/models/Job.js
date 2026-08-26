@@ -41,7 +41,7 @@ const jobSchema = new mongoose.Schema(
                 "completed",
                 "retrying",
                 "failed",
-                "canceled"
+                "cancelled"
             ],
             default: "pending"
         },
