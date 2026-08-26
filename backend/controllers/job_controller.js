@@ -32,9 +32,9 @@ const createJob = async (req, res) => {
             task,
             scheduledFor,
             timeoutMs = 0,
-            priority = 2
+            priority=2
         } = req.body;
-        console.log(scheduledFor);
+        console.log(priority)
 
         if (!task) {
             return res.status(400).json({
@@ -72,17 +72,22 @@ const createJob = async (req, res) => {
         });
 
         if (scheduledDate > new Date()) {
+            await job.save();
+
             await redisClient.zAdd("jobs:scheduled", {
                 score: scheduledDate.getTime(),
                 value: job.id
             });
         } else {
+            job.status = "queued";
+            job.sentToQueueAt = new Date();
+
+            await job.save();
+
             await redisClient.rPush(
                 getQueue(Number(priority)),
                 job.id
             );
-            job.status = "queued";
-            job.sentToQueueAt = new Date();
         }
 
         await job.save();

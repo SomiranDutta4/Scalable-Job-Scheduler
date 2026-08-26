@@ -78,7 +78,6 @@ class Worker {
             }
 
             let queue = "queue:immediate:normal";
-
             if (job.priority === 3) {
                 queue = "queue:immediate:high";
             } else if (job.priority === 1) {
@@ -110,11 +109,17 @@ class Worker {
     }
 
     async processJob(jobId) {
+        console.log("processJob called:", jobId);
+
         const job = await Job.findOne({
             id: jobId
         });
 
+        console.log("Job found:", !!job);
+        console.log("Job status:", job?.status);
+
         if (!job || job.status === "cancelled") {
+            console.log("Returning: job missing or cancelled");
             return;
         }
 
@@ -129,7 +134,10 @@ class Worker {
             }
         );
 
+        console.log("Lock result:", isLocked);
+
         if (!isLocked) {
+            console.log("Returning: job is already locked");
             return;
         }
 
