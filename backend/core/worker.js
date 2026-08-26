@@ -223,7 +223,7 @@ class Worker {
 
             const random = Math.random();
 
-            if (random < 0.05) {
+            if (random < 0.1) {
                 console.log(
                     `Job ${jobId} failed at second ${second}`
                 );
