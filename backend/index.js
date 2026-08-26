@@ -1,7 +1,9 @@
 require("dotenv").config();
 
+
 const express = require("express");
 const http = require("http");
+const cors=require('cors')
 
 const { connectDB } = require("./config/db");
 const { connectRedis } = require("./config/redis");
@@ -12,6 +14,9 @@ const setupWebSocket = require("./websocket");
 const app = express();
 const server = http.createServer(app);
 
+app.use(cors({
+    origin: "http://localhost:5173"
+}));
 app.use(express.json());
 app.use("/api", router);
 const PORT = process.env.PORT || 3000;

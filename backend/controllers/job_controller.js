@@ -15,28 +15,50 @@ const publishEvent = async (jobId, userId, status, extra = {}) => {
     );
 };
 
+const getQueue = priority => {
+    if (priority === 3) {
+        return "queue:immediate:high";
+    }
+    if (priority === 1) {
+        return "queue:immediate:low";
+    }
+    return "queue:immediate:normal";
+};
+
 const createJob = async (req, res) => {
     try {
         const {
             description = "",
             task,
             scheduledFor,
-            timeoutMs = 0
+            timeoutMs = 0,
+            priority = 2
         } = req.body;
+        console.log(scheduledFor);
+
         if (!task) {
             return res.status(400).json({
                 message: "task is required"
             });
         }
+
+        if (![1, 2, 3].includes(Number(priority))) {
+            return res.status(400).json({
+                message: "priority must be 1, 2 or 3"
+            });
+        }
+
         const jobId = randomUUID();
         const scheduledDate = scheduledFor
             ? new Date(scheduledFor)
             : new Date();
+
         if (isNaN(scheduledDate.getTime())) {
             return res.status(400).json({
                 message: "Invalid scheduledFor"
             });
         }
+
         const job = new Job({
             id: jobId,
             userId: req.userId,
@@ -44,9 +66,11 @@ const createJob = async (req, res) => {
             task,
             scheduledFor: scheduledDate,
             timeoutMs,
+            priority: Number(priority),
             status: "pending",
             attempts: 0
         });
+
         if (scheduledDate > new Date()) {
             await redisClient.zAdd("jobs:scheduled", {
                 score: scheduledDate.getTime(),
@@ -54,18 +78,24 @@ const createJob = async (req, res) => {
             });
         } else {
             await redisClient.rPush(
-                "queue:normal",
+                getQueue(Number(priority)),
                 job.id
             );
             job.status = "queued";
             job.sentToQueueAt = new Date();
         }
+
         await job.save();
+
         await publishEvent(
             job.id,
             job.userId,
-            job.status
+            job.status,
+            {
+                priority: Number(priority)
+            }
         );
+
         return res.status(201).json({
             message: "Job created successfully",
             job
@@ -78,10 +108,32 @@ const createJob = async (req, res) => {
     }
 };
 
+const getJobs = async (req, res) => {
+    try {
+        const jobs = await Job.find({
+            userId: req.userId
+        }).sort({
+            createdAt: -1
+        });
+
+        return res.status(200).json({
+            jobs
+        });
+    } catch (error) {
+        console.error("Get jobs error:", error);
+        return res.status(500).json({
+            message: "Internal server error"
+        });
+    }
+};
+
 const getJob = async (req, res) => {
     try {
         const { jobId } = req.params;
-        const job = await Job.findOne({ id: jobId });
+        const job = await Job.findOne({
+            id: jobId,
+            userId: req.userId
+        });
 
         if (!job) {
             return res.status(404).json({
@@ -103,7 +155,10 @@ const getJob = async (req, res) => {
 const cancelJob = async (req, res) => {
     try {
         const { jobId } = req.params;
-        const job = await Job.findOne({ id: jobId });
+        const job = await Job.findOne({
+            id: jobId,
+            userId: req.userId
+        });
 
         if (!job) {
             return res.status(404).json({
@@ -157,6 +212,7 @@ const retryJob = async (req, res) => {
         const { jobId } = req.params;
         const job = await Job.findOne({
             id: jobId,
+            userId: req.userId
         });
 
         if (!job) {
@@ -175,7 +231,7 @@ const retryJob = async (req, res) => {
         }
 
         await redisClient.rPush(
-            "queue:normal",
+            getQueue(job.priority),
             job.id
         );
 
@@ -191,6 +247,7 @@ const retryJob = async (req, res) => {
             job.userId,
             "queued",
             {
+                priority: job.priority,
                 msg: "Job manually retried"
             }
         );
@@ -210,6 +267,7 @@ const retryJob = async (req, res) => {
 module.exports = {
     createJob,
     getJob,
+    getJobs,
     cancelJob,
     retryJob
 };

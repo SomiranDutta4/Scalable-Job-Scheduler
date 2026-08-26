@@ -45,6 +45,7 @@ const signup = async (req, res) => {
     }
 };
 
+
 const login = async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -97,7 +98,51 @@ const login = async (req, res) => {
     }
 };
 
+
+const testUser = async (req, res) => {
+    console.log("here")
+    try {
+        const { randomUUID } = require("crypto");
+
+        const id = randomUUID();
+
+        const user = await User.create({
+            id,
+            name: "test",
+            email: `${id}@test.com`,
+            passwordHash: "test"
+        });
+
+        const token = jwt.sign(
+            {
+                userId: user.id
+            },
+            process.env.JWT_SECRET,
+            {
+                expiresIn: "1h"
+            }
+        );
+
+        return res.status(201).json({
+            message: "Test user created",
+            token,
+            user: {
+                id: user.id,
+                name: user.name
+            }
+        });
+    } catch (error) {
+        console.error("Test user error:", error);
+
+        return res.status(500).json({
+            message: "Internal server error"
+        });
+    }
+};
+
+
 module.exports = {
     signup,
-    login
+    login,
+    testUser
 };

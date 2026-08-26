@@ -11,7 +11,11 @@ const jobSchema = new mongoose.Schema(
             type: String,
             required: true
         },
-
+        priority: {
+            type: Number,
+            enum: [1, 2, 3],
+            default: 2
+        },
         task: {
             type: String,
             required: true
