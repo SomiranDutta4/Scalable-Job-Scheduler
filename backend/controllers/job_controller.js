@@ -2,33 +2,41 @@ const { randomUUID } = require("crypto");
 const Job = require("../models/job");
 const { redisClient } = require("../config/redis");
 
+const publishEvent = async (jobId, status, extra = {}) => {
+    const event = {
+        jobId: String(jobId),
+        status,
+        ...extra
+    };
+    await redisClient.publish(
+        "events:jobs",
+        JSON.stringify(event)
+    );
+};
+
 const createJob = async (req, res) => {
     try {
         const {
-            description,
+            description = "",
             task,
             scheduledFor,
+            timeoutMs = 0
         } = req.body;
-
-        if (!description || !task || !timeoutMs) {
+        if (!task) {
             return res.status(400).json({
-                message: "Description, task and timeoutMs are required"
+                message: "task is required"
             });
         }
-
         const jobId = randomUUID();
-
         const scheduledDate = scheduledFor
             ? new Date(scheduledFor)
             : new Date();
-
         if (isNaN(scheduledDate.getTime())) {
             return res.status(400).json({
                 message: "Invalid scheduledFor"
             });
         }
-
-        var job = new Job({
+        const job = new Job({
             id: jobId,
             description,
             task,
@@ -37,7 +45,6 @@ const createJob = async (req, res) => {
             status: "pending",
             attempts: 0
         });
-
         if (scheduledDate > new Date()) {
             await redisClient.zAdd("jobs:scheduled", {
                 score: scheduledDate.getTime(),
@@ -48,19 +55,21 @@ const createJob = async (req, res) => {
                 "queue:normal",
                 job.id
             );
-            job.status="queued"
+            job.status = "queued";
+            job.sentToQueueAt = new Date();
         }
-        await job.save()
-
+        await job.save();
+        await publishEvent(
+            job.id,
+            job.status
+        );
 
         return res.status(201).json({
             message: "Job created successfully",
             job
         });
-
     } catch (error) {
         console.error("Create job error:", error);
-
         return res.status(500).json({
             message: "Internal server error"
         });
@@ -70,7 +79,6 @@ const createJob = async (req, res) => {
 const getJob = async (req, res) => {
     try {
         const { jobId } = req.params;
-
         const job = await Job.findOne({ id: jobId });
 
         if (!job) {
@@ -84,18 +92,15 @@ const getJob = async (req, res) => {
         });
     } catch (error) {
         console.error("Get job error:", error);
-
         return res.status(500).json({
             message: "Internal server error"
         });
     }
 };
 
-
 const cancelJob = async (req, res) => {
     try {
         const { jobId } = req.params;
-
         const job = await Job.findOne({ id: jobId });
 
         if (!job) {
@@ -104,30 +109,17 @@ const cancelJob = async (req, res) => {
             });
         }
 
-        if (job.status === "pending" || job.status === "retrying") {
+        if (
+            job.status === "pending" ||
+            job.status === "retrying"
+        ) {
             await redisClient.zRem(
                 "jobs:scheduled",
                 job.id
             );
-        }
-
-        else if (job.status === "queued") {
-            await redisClient.lRem(
-                "queue:normal",
-                0,
-                job.id
-            );
-        }
-        // imcomplete processing handling
-
-        else if (job.status === "processing") {
-            return res.status(400).json({
-                message: "Job is currently being processed"
-            });
-        }
-        // to do: release lock, and go to next job immediately
-
-        else if (
+        } else if (job.status === "processing") {
+            // Worker will handle cancellation.
+        } else if (
             job.status === "completed" ||
             job.status === "failed" ||
             job.status === "cancelled"
@@ -140,14 +132,17 @@ const cancelJob = async (req, res) => {
         job.status = "cancelled";
         await job.save();
 
+        await publishEvent(
+            job.id,
+            "cancelled"
+        );
+
         return res.status(200).json({
             message: "Job cancelled successfully",
             job
         });
-
     } catch (error) {
         console.error("Cancel job error:", error);
-
         return res.status(500).json({
             message: "Internal server error"
         });
@@ -164,6 +159,7 @@ const retryJob = async (req, res) => {
                 message: "Job not found"
             });
         }
+
         if (
             job.status !== "failed" &&
             job.status !== "cancelled"
@@ -185,20 +181,25 @@ const retryJob = async (req, res) => {
 
         await job.save();
 
+        await publishEvent(
+            job.id,
+            "queued",
+            {
+                msg: "Job manually retried"
+            }
+        );
+
         return res.status(200).json({
             message: "Job queued for retry",
             job
         });
-
     } catch (error) {
         console.error("Retry job error:", error);
-
         return res.status(500).json({
             message: "Internal server error"
         });
     }
 };
-
 
 module.exports = {
     createJob,
