@@ -16,7 +16,11 @@ const jobSchema = new mongoose.Schema(
             type: String,
             required: true
         },
-
+        userId: {
+            type: String,
+            required: true,
+            ref: "User"
+        },
         createdAt: {
             type: Date,
             default: Date.now

@@ -5,17 +5,17 @@ const rateLimiter = (limit = 10, window = 60) => {
         try {
             const key = `ratelimit:${req.userId}`;
             const current = await redisClient.incr(key);
+
             if (current === 1) {
-                await redisClient.expire(
-                    key,
-                    window
-                );
+                await redisClient.expire(key, window);
             }
+
             if (current > limit) {
                 return res.status(429).json({
                     message: "Rate limit exceeded"
                 });
             }
+
             next();
         } catch (error) {
             console.error(

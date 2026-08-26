@@ -2,9 +2,10 @@ const { randomUUID } = require("crypto");
 const Job = require("../models/job");
 const { redisClient } = require("../config/redis");
 
-const publishEvent = async (jobId, status, extra = {}) => {
+const publishEvent = async (jobId, userId, status, extra = {}) => {
     const event = {
         jobId: String(jobId),
+        userId: String(userId),
         status,
         ...extra
     };
@@ -38,6 +39,7 @@ const createJob = async (req, res) => {
         }
         const job = new Job({
             id: jobId,
+            userId: req.userId,
             description,
             task,
             scheduledFor: scheduledDate,
@@ -61,9 +63,9 @@ const createJob = async (req, res) => {
         await job.save();
         await publishEvent(
             job.id,
+            job.userId,
             job.status
         );
-
         return res.status(201).json({
             message: "Job created successfully",
             job
@@ -134,6 +136,7 @@ const cancelJob = async (req, res) => {
 
         await publishEvent(
             job.id,
+            job.userId,
             "cancelled"
         );
 
@@ -152,7 +155,9 @@ const cancelJob = async (req, res) => {
 const retryJob = async (req, res) => {
     try {
         const { jobId } = req.params;
-        const job = await Job.findOne({ id: jobId });
+        const job = await Job.findOne({
+            id: jobId,
+        });
 
         if (!job) {
             return res.status(404).json({
@@ -183,6 +188,7 @@ const retryJob = async (req, res) => {
 
         await publishEvent(
             job.id,
+            job.userId,
             "queued",
             {
                 msg: "Job manually retried"

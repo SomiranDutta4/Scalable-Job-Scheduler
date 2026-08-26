@@ -10,23 +10,25 @@ const rateLimiter = require("../services/rateLimiter")
 router.post('/job/new',rateLimiter(10, 60),createJob)
 router.get(
     "/job/status/:jobId",
-    rateLimiter(10, 60),
+    auth,
     getJob
 );
 
 router.put(
     "/job/cancel/:jobId",
-    rateLimiter(10, 60),
+    auth,
     cancelJob
 );
 
 router.put(
     "/job/retry/:jobId",
+    auth,
     rateLimiter(10, 60),
     retryJob
 );
-// router.post('/user/signup',signup)
-// router.post('/user/login',login)
+
+router.post('/user/signup',signup)
+router.post('/user/login',login)
 
 module. exports={
     router
